@@ -231,8 +231,31 @@
             margin-bottom: 20px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
             color: var(--accent-primary);
+        }
+
+        /* NEW CSS FOR COPY BUTTON */
+        .btn-copy-ips {
+            background-color: var(--bg-app);
+            border: 1px solid var(--border-main);
+            color: var(--text-main);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto; /* Pushes button to the far right of the flex container */
+            transition: all 0.2s;
+        }
+
+        .btn-copy-ips:hover {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            background-color: var(--badge-bg);
         }
 
         .table-responsive {
@@ -440,6 +463,35 @@
         localStorage.setItem("theme", next);
     }
 
+    /* NEW FUNCTION: Copy Domain IPs to Clipboard */
+    function copyDomainIps(domain, btnElement) {
+        const ipsSet = domainIpStorageObject[domain];
+        if (!ipsSet || ipsSet.size === 0) {
+            alert('No resolved IPs found for this domain yet.');
+            return;
+        }
+        
+        // Convert set to array and format as newline-separated list
+        const textToCopy = Array.from(ipsSet).join('\n');
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalHTML = btnElement.innerHTML;
+            // Temporarily change button to show success
+            btnElement.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!`;
+            btnElement.style.color = 'var(--success)';
+            btnElement.style.borderColor = 'var(--success)';
+            
+            setTimeout(() => {
+                btnElement.innerHTML = originalHTML;
+                btnElement.style.color = '';
+                btnElement.style.borderColor = '';
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+            alert('Failed to copy IPs to clipboard.');
+        });
+    }
+
     async function executeInspection() {
         const input = document.getElementById('domainInput').value.trim();
         if (!input) return;
@@ -466,7 +518,15 @@
                 const domainGroup = document.createElement('div');
                 domainGroup.className = 'domain-group-wrapper';
 
-                let groupHtml = `<h4 class="domain-group-title">🎯 ${escapeHtml(target)}</h4>`;
+                // UPDATED: Added the copy button to the h4 title container
+                let groupHtml = `
+                <h4 class="domain-group-title">
+                    🎯 ${escapeHtml(target)}
+                    <button class="btn-copy-ips" onclick="copyDomainIps('${target}', this)" title="Copy all resolved IPs for this domain">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy IP List
+                    </button>
+                </h4>`;
 
                 groupHtml += `
                 <div class="table-responsive">
@@ -651,7 +711,6 @@
         const domains = Object.keys(domainIpStorageObject);
         if (!domains.length) return;
 
-        // Convert the storage maps into independent lists of sorted IPs per domain
         let domainIpLists = {};
         let maximumRowDepth = 0;
 
@@ -667,15 +726,12 @@
 
         let csvLines = [];
 
-        // Row 1: Target Domain main headers
         let headerRow1 = domains.map(d => `"TARGET DOMAIN: ${d.toUpperCase()}"`).join(",");
         csvLines.push(headerRow1);
 
-        // Row 2: Content indicators for each column
         let headerRow2 = domains.map(() => `"Authorized IP Assets"`).join(",");
         csvLines.push(headerRow2);
 
-        // Core data lines mapped horizontally cell by cell
         for (let rowIndex = 0; rowIndex < maximumRowDepth; rowIndex++) {
             let lineCells = [];
             domains.forEach(domain => {
@@ -683,7 +739,7 @@
                 if (rowIndex < currentIpPool.length) {
                     lineCells.push(`"${currentIpPool[rowIndex]}"`);
                 } else {
-                    lineCells.push(`""`); // Empty cell placeholder if domain has fewer IPs than others
+                    lineCells.push(`""`);
                 }
             });
             csvLines.push(lineCells.join(","));

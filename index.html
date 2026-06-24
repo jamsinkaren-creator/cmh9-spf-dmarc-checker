@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMH9 SPF/DMARC Checker</title>
+    <style>
+        :root {
+            --bg-app: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --border-main: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --accent-primary: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #16a34a;
+            --error: #dc2626;
+            --warning: #ca8a04;
+            --badge-bg: #eff6ff;
+            --badge-text: #2563eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+            --radius: 12px;
+        }
+
+        [data-theme="dark"] {
+            --bg-app: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #0f172a;
+            --border-main: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-primary: #3b82f6;
+            --accent-hover: #60a5fa;
+            --success: #4ade80;
+            --error: #f87171;
+            --warning: #facc15;
+            --badge-bg: rgba(59, 130, 246, 0.15);
+            --badge-text: #93c5fd;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            margin: 0;
+            padding: 50px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.03em;
+            text-transform: uppercase;
+            background: linear-gradient(to right, var(--accent-primary), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .theme-toggle {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-main);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .search-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-main);
+            border-radius: var(--radius);
+            padding: 32px;
+            box-shadow: var(--shadow);
+            margin-bottom: 32px;
+        }
+
+        .search-card label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .search-block {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 140px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-main);
+            border-radius: 8px;
+            color: var(--text-main);
+            padding: 16px;
+            font-size: 1rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 4px var(--badge-bg);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 32px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            align-self: flex-start;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .dashboard-layout {
+            display: none;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-main);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .metric-icon {
+            padding: 16px;
+            border-radius: 10px;
+            background-color: var(--bg-app);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-data .num {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+
+        .metric-data .lbl {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .domain-group-wrapper {
+            border: 1px solid var(--border-main);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+            background-color: var(--bg-card);
+            box-shadow: var(--shadow);
+        }
+
+        .domain-group-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-primary);
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border-main);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: var(--bg-app);
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-main);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-main);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .mono-text {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.9rem;
+            background-color: var(--bg-app);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-main);
+            word-break: break-all;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            padding: 6px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+
+        .status-badge.valid { background-color: rgba(22, 163, 74, 0.12); color: var(--success); }
+        .status-badge.missing { background-color: rgba(220, 38, 38, 0.12); color: var(--error); }
+
+        .action-tray {
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .btn-outline {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-main);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 14px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            justify-content: center;
+        }
+
+        @media (min-width: 768px) {
+            .btn-outline {
+                width: auto;
+            }
+        }
+
+        .btn-outline:hover {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .status-banner {
+            text-align: center;
+            padding: 40px;
+            color: var(--accent-primary);
+            display: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .error-banner {
+            background-color: rgba(220, 38, 38, 0.08);
+            border: 1px solid var(--error);
+            color: var(--error);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border-main);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 12px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <nav class="top-nav">
+        <div class="brand">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h1>CMH9 SPF/DMARC Checker</h1>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>Switch Theme</span>
+        </button>
+    </nav>
+
+    <div class="search-card">
+        <div class="search-block">
+            <label for="domainInput">Target Domains (Paste one domain per line)</label>
+            <textarea id="domainInput" placeholder="google.com&#10;github.com&#10;microsoft.com"></textarea>
+            <button class="btn-primary" id="scanBtn" onclick="executeInspection()">Run Diagnostics</button>
+        </div>
+    </div>
+
+    <div id="statusBanner" class="status-banner"><span class="spinner"></span> <span id="statusTxt">Running tests...</span></div>
+    <div id="errorBanner" class="error-banner"></div>
+
+    <div id="dashboard" class="dashboard-layout">
+        <div class="action-tray">
+            <button class="btn-outline" id="downloadBtn" onclick="exportHorizontalExcelCSV()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Export Optimized Sheets to Excel (.csv)
+            </button>
+        </div>
+
+        <div class="summary-row">
+            <div class="metric-card">
+                <div class="metric-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </div>
+                <div class="metric-data">
+                    <div class="num" id="m_ips">0</div>
+                    <div class="lbl">Total Unique IP Assets Discovered</div>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><polyline points="16 16 12 12 8 16"/><polyline points="12 12 12 21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                </div>
+                <div class="metric-data">
+                    <div class="num" id="m_depth">0</div>
+                    <div class="lbl">Total Distinct Domains Mapping</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="domainGroupsContainer"></div>
+    </div>
+</div>
+
+<script>
+    let domainIpStorageObject = {};
+    let processedFileNameString = '';
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const activeTheme = localStorage.getItem("theme") || "light";
+        document.documentElement.setAttribute("data-theme", activeTheme);
+    });
+
+    function toggleTheme() {
+        const cur = document.documentElement.getAttribute("data-theme");
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("theme", next);
+    }
+
+    async function executeInspection() {
+        const input = document.getElementById('domainInput').value.trim();
+        if (!input) return;
+        
+        const targetDomains = input.split('\n').map(d => d.trim()).filter(d => d.length > 0);
+        if (targetDomains.length === 0) return;
+
+        processedFileNameString = targetDomains.slice(0, 3).join('_') + (targetDomains.length > 3 ? '_batch' : '');
+        prepareInterfaceForLoading();
+        
+        try {
+            const totalUniqueDomains = new Set();
+            const uniqueGlobalIpsCount = new Set();
+            const groupsContainer = document.getElementById('domainGroupsContainer');
+
+            for (let target of targetDomains) {
+                const [spfChain, dmarcRecord] = await Promise.all([
+                    resolveSpfRecursive(target, new Set(), 0),
+                    fetchDmarcProfile(target)
+                ]);
+
+                domainIpStorageObject[target] = new Set();
+
+                const domainGroup = document.createElement('div');
+                domainGroup.className = 'domain-group-wrapper';
+
+                let groupHtml = `<h4 class="domain-group-title">🎯 ${escapeHtml(target)}</h4>`;
+
+                groupHtml += `
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 25%">Security Type</th>
+                                <th style="width: 25%">Policy Status</th>
+                                <th>Discovered DMARC TXT Record</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><b>DMARC Core Policy</b></td>
+                                <td>${dmarcRecord ? '<span class="status-badge valid">Active</span>' : '<span class="status-badge missing">Missing</span>'}</td>
+                                <td>${dmarcRecord ? `<span class="mono-text">${escapeHtml(dmarcRecord)}</span>` : '<span class="text-muted">No policy located.</span>'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>`;
+
+                groupHtml += `
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40%">Origin Authority Chain Domain</th>
+                                <th>Active SPF Record Rules Configuration</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                for (let entry of spfChain) {
+                    totalUniqueDomains.add(entry.domain);
+                    
+                    groupHtml += `
+                            <tr>
+                                <td><span class="text-muted">🌐</span> <b>${escapeHtml(entry.domain)}</b></td>
+                                <td><span class="mono-text">${escapeHtml(entry.spf_record)}</span></td>
+                            </tr>`;
+
+                    const expandedIps = await expandSubnetRanges(entry.ips);
+                    expandedIps.forEach(ip => {
+                        uniqueGlobalIpsCount.add(ip);
+                        domainIpStorageObject[target].add(ip);
+                    });
+                }
+
+                groupHtml += `
+                        </tbody>
+                    </table>
+                </div>`;
+
+                domainGroup.innerHTML = groupHtml;
+                groupsContainer.appendChild(domainGroup);
+            }
+
+            document.getElementById('m_ips').innerText = uniqueGlobalIpsCount.size;
+            document.getElementById('m_depth').innerText = totalUniqueDomains.size;
+            
+            document.getElementById('dashboard').style.display = 'flex';
+            if(Object.keys(domainIpStorageObject).length === 0) document.getElementById('downloadBtn').style.display = 'none';
+
+        } catch (error) {
+            displayFailureMessage("Fatal Analysis Core Execution Fault: " + error.message);
+        } finally {
+            document.getElementById('statusBanner').style.display = 'none';
+            document.getElementById('scanBtn').disabled = false;
+        }
+    }
+
+    async function cloudflareDnsEngine(name, type) {
+        const endpoint = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`;
+        const res = await fetch(endpoint, { headers: { 'Accept': 'application/dns-json' } });
+        const data = await res.json();
+        return data.Answer || [];
+    }
+
+    async function fetchDmarcProfile(domain) {
+        try {
+            const records = await cloudflareDnsEngine(`_dmarc.${domain}`, 'TXT');
+            const dmarc = records.find(r => r.data.replace(/^"|"$/g, '').toLowerCase().startsWith('v=dmarc1'));
+            return dmarc ? dmarc.data.replace(/^"|"$/g, '').replace(/\\"/g, '"') : null;
+        } catch { return null; }
+    }
+
+    async function resolveSpfRecursive(domain, visited, depth) {
+        if (visited.has(domain) || depth > 10) return [];
+        visited.add(domain);
+
+        let structuralTree = [];
+        let spfPayloads = [];
+        let baseIps = new Set();
+
+        try {
+            document.getElementById('statusTxt').innerText = `Resolving zone maps: ${domain}...`;
+            const txtRecords = await cloudflareDnsEngine(domain, 'TXT');
+
+            for (let ans of txtRecords) {
+                let parsed = ans.data.replace(/^"|"$/g, '').replace(/\\"/g, '"');
+                if (parsed.toLowerCase().startsWith('v=spf1')) {
+                    spfPayloads.push(parsed);
+                    const pieces = parsed.split(/\s+/);
+                    
+                    for (let piece of pieces) {
+                        let lowerPiece = piece.toLowerCase();
+                        if (lowerPiece.startsWith('ip4:') || lowerPiece.startsWith('ip6:')) {
+                            baseIps.add(piece.substring(4));
+                        } else if (lowerPiece === 'a' || lowerPiece.startsWith('a:')) {
+                            let target = lowerPiece.startsWith('a:') ? piece.substring(2) : domain;
+                            try {
+                                const a = await cloudflareDnsEngine(target, 'A');
+                                const aaaa = await cloudflareDnsEngine(target, 'AAAA');
+                                [...a, ...aaaa].forEach(record => baseIps.add(record.data));
+                            } catch {}
+                        } else if (lowerPiece === 'mx' || lowerPiece.startsWith('mx:')) {
+                            let target = lowerPiece.startsWith('mx:') ? piece.substring(3) : domain;
+                            try {
+                                const mxTargets = await cloudflareDnsEngine(target, 'MX');
+                                for (let mx of mxTargets) {
+                                    const hostname = mx.data.split(/\s+/)[1].replace(/\.$/, '');
+                                    const a = await cloudflareDnsEngine(hostname, 'A');
+                                    const aaaa = await cloudflareDnsEngine(hostname, 'AAAA');
+                                    [...a, ...aaaa].forEach(record => baseIps.add(record.data));
+                                }
+                            } catch {}
+                        } else if (lowerPiece.startsWith('include:')) {
+                            let nestDomain = piece.substring(8);
+                            let structuralSubData = await resolveSpfRecursive(nestDomain, visited, depth + 1);
+                            structuralTree = structuralTree.concat(structuralSubData);
+                        }
+                    }
+                }
+            }
+
+            structuralTree.unshift({
+                domain: domain,
+                spf_record: spfPayloads.length ? spfPayloads.join(" | ") : "No structural SPF rules located.",
+                ips: Array.from(baseIps)
+            });
+
+        } catch (err) {
+            structuralTree.unshift({ domain: domain, spf_record: 'Connection Timeout Fault', ips: [] });
+        }
+
+        return structuralTree;
+    }
+
+    async function expandSubnetRanges(list) {
+        let targets = new Set();
+        for (let entry of list) {
+            entry = entry.trim().toLowerCase();
+            if (!entry) continue;
+
+            if (entry.includes('/')) {
+                let chunks = entry.split('/');
+                let rootIp = chunks[0];
+                let mask = parseInt(chunks[1]);
+                
+                if (rootIp.includes('.') && mask >= 24 && mask <= 32) {
+                    let iterations = Math.pow(2, 32 - mask);
+                    let longValue = numericHexConversion(rootIp);
+                    let initialBlock = longValue & (0xFFFFFFFF << (32 - mask));
+                    for(let i=0; i < iterations; i++) {
+                        targets.add(reverseHexNumeric(initialBlock + i));
+                    }
+                } else { targets.add(entry); }
+            } else { targets.add(entry); }
+        }
+        return Array.from(targets);
+    }
+
+    function numericHexConversion(ip) {
+        return ip.split('.').reduce((long, segment) => (long << 8) + parseInt(segment, 10), 0) >>> 0;
+    }
+
+    function reverseHexNumeric(long) {
+        return [(long >>> 24) & 255, (long >>> 16) & 255, (long >>> 8) & 255, long & 255].join('.');
+    }
+
+    function exportHorizontalExcelCSV() {
+        const domains = Object.keys(domainIpStorageObject);
+        if (!domains.length) return;
+
+        // Convert the storage maps into independent lists of sorted IPs per domain
+        let domainIpLists = {};
+        let maximumRowDepth = 0;
+
+        domains.forEach(domain => {
+            const sortedList = Array.from(domainIpStorageObject[domain]).sort((x, y) => 
+                x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' })
+            );
+            domainIpLists[domain] = sortedList;
+            if (sortedList.length > maximumRowDepth) {
+                maximumRowDepth = sortedList.length;
+            }
+        });
+
+        let csvLines = [];
+
+        // Row 1: Target Domain main headers
+        let headerRow1 = domains.map(d => `"TARGET DOMAIN: ${d.toUpperCase()}"`).join(",");
+        csvLines.push(headerRow1);
+
+        // Row 2: Content indicators for each column
+        let headerRow2 = domains.map(() => `"Authorized IP Assets"`).join(",");
+        csvLines.push(headerRow2);
+
+        // Core data lines mapped horizontally cell by cell
+        for (let rowIndex = 0; rowIndex < maximumRowDepth; rowIndex++) {
+            let lineCells = [];
+            domains.forEach(domain => {
+                let currentIpPool = domainIpLists[domain];
+                if (rowIndex < currentIpPool.length) {
+                    lineCells.push(`"${currentIpPool[rowIndex]}"`);
+                } else {
+                    lineCells.push(`""`); // Empty cell placeholder if domain has fewer IPs than others
+                }
+            });
+            csvLines.push(lineCells.join(","));
+        }
+
+        const textPayload = csvLines.join("\n");
+        const binaryStream = new Blob([textPayload], { type: "text/csv;charset=utf-8;" });
+        const trigger = document.createElement("a");
+        trigger.href = URL.createObjectURL(binaryStream);
+        trigger.download = `cmh9_horizontal_spf_matrix_${processedFileNameString}.csv`;
+        trigger.click();
+    }
+
+    function prepareInterfaceForLoading() {
+        document.getElementById('statusBanner').style.display = 'block';
+        document.getElementById('errorBanner').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('domainGroupsContainer').innerHTML = '';
+        document.getElementById('scanBtn').disabled = true;
+        document.getElementById('downloadBtn').style.display = 'flex';
+        domainIpStorageObject = {};
+    }
+
+    function displayFailureMessage(txt) {
+        const errCard = document.getElementById('errorBanner');
+        errCard.innerText = txt;
+        errCard.style.display = 'block';
+    }
+
+    function escapeHtml(val) {
+        return val.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>
